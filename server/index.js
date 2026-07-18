@@ -212,12 +212,12 @@ io.on('connection', (socket) => {
 });
 
 // Serve the built React app
-app.use(express.static(path.join(__dirname, 'client/dist')))
+app.use(express.static(path.join(__dirname, 'client-dist')));
 
 app.get('*', (req, res) => {
-  if (req.path.startsWith('/api')) return res.status(404).json({ error: 'Not found' })
-  res.sendFile(path.join(__dirname, 'client/dist/index.html'))
-})
+  if (req.path.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
+  res.sendFile(path.join(__dirname, 'client-dist/index.html'));
+});
 
 // ── Start ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
