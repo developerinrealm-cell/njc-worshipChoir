@@ -1,14 +1,3 @@
-require('dotenv').config();
-const cookieParser = require('cookie-parser');
-const jwt = require('jsonwebtoken');
-const { OAuth2Client } = require('google-auth-library');
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const JWT_SECRET = process.env.JWT_SECRET;
-const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
-
-app.use(cookieParser());
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -16,6 +5,11 @@ const cors = require('cors');
 const Database = require('better-sqlite3');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+require('dotenv').config();
+const cookieParser = require('cookie-parser');
+const cookie = require('cookie');
+const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const server = http.createServer(app);
@@ -23,8 +17,13 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }
 });
 
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const JWT_SECRET = process.env.JWT_SECRET;
+const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 
 // ── Auth ─────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
@@ -172,6 +171,9 @@ function getAllSongs() {
 }
 
 // ── Song Routes ──────────────────────────────────────────────
+// NOTE: GET routes stay unauthenticated on purpose — the public
+// /display page reads song data with no login, so it must be able
+// to fetch these.
 app.get('/api/songs', (req, res) => {
   res.json(getAllSongs());
 });
@@ -258,7 +260,23 @@ app.delete('/api/setlists/:id', requireAuth, (req, res) => {
 });
 
 // ── Socket.io — Live Presenter Sync ─────────────────────────
-// State: one active presenter state per "room" (default: 'main')
+// Anyone can connect and receive presenter:state (needed for the
+// public /display page), but only an authenticated socket
+// (one that presents a valid auth_token cookie) can push updates.
+io.use((socket, next) => {
+  try {
+    const rawCookies = socket.handshake.headers.cookie || '';
+    const parsed = cookie.parse(rawCookies);
+    const token = parsed.auth_token;
+    if (token) {
+      socket.user = jwt.verify(token, JWT_SECRET);
+    }
+    next();
+  } catch {
+    next(); // treat as unauthenticated viewer, don't hard-fail the connection
+  }
+});
+
 const presenterState = {
   main: { songId: null, sectionIndex: 0, lang: 'en', blank: false }
 };
@@ -267,10 +285,12 @@ io.on('connection', (socket) => {
   const room = socket.handshake.query.room || 'main';
   socket.join(room);
 
-  // Send current state to newly connected client
   socket.emit('presenter:state', presenterState[room] || presenterState.main);
 
   socket.on('presenter:update', (state) => {
+    if (!socket.user) {
+      return socket.emit('presenter:error', 'Not authorized to control the presenter');
+    }
     presenterState[room] = { ...presenterState[room], ...state };
     socket.to(room).emit('presenter:state', presenterState[room]);
   });
