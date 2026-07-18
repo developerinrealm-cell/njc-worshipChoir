@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #f4f3ef;
+    --bg2: #fcfbf8;
+    --bg3: #f0ece5;
+    --bg4: #e4ddd0;
+    --border: rgba(56, 44, 28, 0.12);
+    --border2: rgba(56, 44, 28, 0.18);
+    --text: #2f2a23;
+    --text2: #5d564e;
+    --text3: #847a6e;
+    --accent: #6f5edb;
+    --accent-light: #8d7fe8;
+    --green: #3b8f6a;
+    --red: #c35a5a;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body, #root {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a3a44; }
+}
+
+
+@layer components {
+  .btn {
+    @apply px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition-all duration-150 font-medium;
+    border-color: var(--border2);
+    background: transparent;
+    color: var(--text2);
+  }
+  .btn:hover { background: var(--bg3); color: var(--text); }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    @apply btn;
+    background: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: #fff !important;
+  }
+  .btn-primary:hover { background: #6558e0 !important; }
+
+  .btn-danger {
+    @apply btn;
+    color: var(--red) !important;
+    border-color: rgba(248,113,113,0.3) !important;
+  }
+  .btn-danger:hover { background: rgba(248,113,113,0.1) !important; }
+
+  .btn-ghost {
+    @apply btn border-transparent;
+    color: var(--text3);
+  }
+  .btn-ghost:hover { background: var(--bg3); color: var(--text2); }
+
+  .input {
+    @apply w-full rounded-lg px-3 outline-none text-sm transition-colors duration-150;
+    height: 34px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .input:focus { border-color: var(--accent); }
+  .input::placeholder { color: var(--text3); }
+
+  .textarea {
+    @apply w-full rounded-lg px-3 py-2 outline-none text-sm transition-colors duration-150 resize-y;
+    min-height: 80px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .textarea:focus { border-color: var(--accent); }
+  .textarea::placeholder { color: var(--text3); }
+
+  .select {
+    @apply rounded-lg px-3 outline-none text-sm transition-colors duration-150 cursor-pointer;
+    height: 34px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .select:focus { border-color: var(--accent); }
+  .select option { background: var(--bg3); }
+
+  .card {
+    @apply rounded-xl;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+  }
+
+  .label {
+    @apply block text-xs font-medium uppercase tracking-widest mb-1;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+  }
+
+  .badge {
+    @apply text-xs px-2 py-0.5 rounded-full font-medium;
+  }
+}
