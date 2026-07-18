@@ -7,6 +7,13 @@ app = 'njc-worship-presenter'
 primary_region = 'bom'
 
 [build]
+  [build.args]
+    VITE_GOOGLE_CLIENT_ID = "656537064386-eilal5jl3b013fvpk755632fvg8n80mn.apps.googleusercontent.com"
+
+[mounts]
+  source = "worship_data"
+  destination = "/data"
+
 [http_service]
   internal_port = 3001
   force_https = true

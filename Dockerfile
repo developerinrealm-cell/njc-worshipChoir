@@ -1,6 +1,8 @@
 # ---- Build the React frontend ----
 FROM node:20-slim AS client-build
 WORKDIR /app/client
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 COPY client/package*.json ./
 RUN npm install
 COPY client/ ./
