@@ -1,3 +1,14 @@
+require('dotenv').config();
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const JWT_SECRET = process.env.JWT_SECRET;
+const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+
+app.use(cookieParser());
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -14,6 +25,62 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// ── Auth ─────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  const token = req.cookies?.auth_token;
+  if (!token) return res.status(401).json({ error: 'Not logged in' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'Session expired, please log in again' });
+  }
+}
+
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { credential } = req.body;
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const email = payload.email.toLowerCase();
+
+    if (!ALLOWED_EMAILS.includes(email)) {
+      return res.status(403).json({ error: 'Your account is not authorized for this app' });
+    }
+
+    const token = jwt.sign({ email, name: payload.name }, JWT_SECRET, { expiresIn: '30d' });
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+    res.json({ email, name: payload.name });
+  } catch (e) {
+    console.error('Google auth error:', e);
+    res.status(401).json({ error: 'Login failed' });
+  }
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const token = req.cookies?.auth_token;
+  if (!token) return res.json({ loggedIn: false });
+  try {
+    const user = jwt.verify(token, JWT_SECRET);
+    res.json({ loggedIn: true, email: user.email, name: user.name });
+  } catch {
+    res.json({ loggedIn: false });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('auth_token');
+  res.json({ ok: true });
+});
 
 // ── Database setup ──────────────────────────────────────────
 const dbPath = process.env.DB_PATH || path.join(__dirname, 'worship.db');
@@ -115,7 +182,7 @@ app.get('/api/songs/:id', (req, res) => {
   res.json(song);
 });
 
-app.post('/api/songs', (req, res) => {
+app.post('/api/songs', requireAuth, (req, res) => {
   const { title, key = 'C', author = '', sections = [] } = req.body;
   const id = uuidv4();
   db.prepare('INSERT INTO songs (id,title,key,author) VALUES (?,?,?,?)').run(id, title, key, author);
@@ -128,7 +195,7 @@ app.post('/api/songs', (req, res) => {
   res.status(201).json(song);
 });
 
-app.put('/api/songs/:id', (req, res) => {
+app.put('/api/songs/:id', requireAuth, (req, res) => {
   const { title, key, author, sections } = req.body;
   const now = Math.floor(Date.now() / 1000);
   db.prepare('UPDATE songs SET title=?,key=?,author=?,updated_at=? WHERE id=?').run(title, key, author, now, req.params.id);
@@ -142,14 +209,14 @@ app.put('/api/songs/:id', (req, res) => {
   res.json(song);
 });
 
-app.delete('/api/songs/:id', (req, res) => {
+app.delete('/api/songs/:id', requireAuth, (req, res) => {
   db.prepare('DELETE FROM songs WHERE id=?').run(req.params.id);
   io.emit('songs:updated');
   res.json({ ok: true });
 });
 
 // ── Setlist Routes ───────────────────────────────────────────
-app.get('/api/setlists', (req, res) => {
+app.get('/api/setlists', requireAuth, (req, res) => {
   const lists = db.prepare('SELECT * FROM setlists ORDER BY created_at DESC').all();
   const result = lists.map(sl => ({
     ...sl,
@@ -162,7 +229,7 @@ app.get('/api/setlists', (req, res) => {
   res.json(result);
 });
 
-app.post('/api/setlists', (req, res) => {
+app.post('/api/setlists', requireAuth, (req, res) => {
   const { name, date = '', songIds = [] } = req.body;
   const id = uuidv4();
   db.prepare('INSERT INTO setlists (id,name,date) VALUES (?,?,?)').run(id, name, date);
@@ -173,7 +240,7 @@ app.post('/api/setlists', (req, res) => {
   res.status(201).json({ id, name, date });
 });
 
-app.put('/api/setlists/:id', (req, res) => {
+app.put('/api/setlists/:id', requireAuth, (req, res) => {
   const { name, date, songIds = [] } = req.body;
   db.prepare('UPDATE setlists SET name=?,date=? WHERE id=?').run(name, date, req.params.id);
   db.prepare('DELETE FROM setlist_songs WHERE setlist_id=?').run(req.params.id);
@@ -184,7 +251,7 @@ app.put('/api/setlists/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/setlists/:id', (req, res) => {
+app.delete('/api/setlists/:id', requireAuth, (req, res) => {
   db.prepare('DELETE FROM setlists WHERE id=?').run(req.params.id);
   io.emit('setlists:updated');
   res.json({ ok: true });

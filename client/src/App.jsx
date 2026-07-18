@@ -4,6 +4,7 @@ import Library from './pages/Library'
 import Controller from './pages/Controller'
 import Display from './pages/Display'
 import Setlists from './pages/Setlists'
+import AuthGate from './components/AuthGate'
 
 function Nav() {
   const { connected } = useSocket()
@@ -57,12 +58,12 @@ function AppInner() {
     <div className="h-full flex flex-col">
       {!isDisplay && <Nav />}
       <div className="flex-1 overflow-hidden">
-        <Routes>
-          <Route path="/" element={<Library />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/setlists" element={<Setlists />} />
-          <Route path="/controller" element={<Controller />} />
-          <Route path="/display" element={<Display />} />
+        <Routes>      
+          <Route path="/" element={<AuthGate><Controller /></AuthGate>} />
+          <Route path="/library" element={<AuthGate><Library /></AuthGate>} />
+          <Route path="/setlists" element={<AuthGate><Setlists /></AuthGate>} />
+          <Route path="/controller" element={<AuthGate><Controller /></AuthGate>} />
+          <Route path="/display" element={<Display />} /> {/* stays public */}
         </Routes>
       </div>
     </div>
