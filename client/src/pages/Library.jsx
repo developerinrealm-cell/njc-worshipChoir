@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSongs } from '../hooks/useSongs'
+import axios from 'axios'
 
 const KEYS = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B']
 const SECTION_TYPES = [
@@ -556,6 +557,37 @@ export default function Library() {
     showToast('Backup downloaded')
   }
 
+  const handleRestoreBackup = (e) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = async (event) => {
+    try {
+      const content = event.target?.result
+      const payload = JSON.parse(content)
+      const songsToRestore = payload.songs || payload // supports both {songs:[...]} and a raw array
+
+      if (!Array.isArray(songsToRestore) || songsToRestore.length === 0) {
+        showToast('No songs found in that file')
+        return
+      }
+
+      if (!window.confirm(`Restore ${songsToRestore.length} song(s) from backup? Existing songs with the same ID will be overwritten.`)) {
+        return
+      }
+
+      const { data } = await axios.post('/api/songs/restore', { songs: songsToRestore })
+      await fetchSongs()
+      showToast(`Restored ${data.count} song(s)!`)
+    } catch (err) {
+      console.error('Restore error:', err)
+      showToast('Restore failed: ' + (err.response?.data?.error || err.message))
+    }
+  }
+  reader.readAsText(file)
+}
+
   return (
     <div className="flex h-full">
       {/* Sidebar */}
@@ -568,6 +600,10 @@ export default function Library() {
             </div>
             <div className="flex flex-col gap-1.5">
               <button className="btn text-xs px-2.5 py-1.5 rounded-full" onClick={handleExportBackup}>Backup</button>
+<label className="btn text-xs px-2.5 py-1.5 rounded-full cursor-pointer text-center">
+  Restore
+  <input type="file" accept=".json" className="hidden" onChange={handleRestoreBackup} />
+</label>
               <button className="btn-primary text-xs px-2.5 py-1.5 rounded-full" onClick={newSong}>+ New</button>
             </div>
           </div>
