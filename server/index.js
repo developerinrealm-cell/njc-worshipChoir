@@ -259,6 +259,37 @@ app.delete('/api/setlists/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/songs/restore', requireAuth, (req, res) => {
+  const { songs = [] } = req.body;
+  if (!Array.isArray(songs) || songs.length === 0) {
+    return res.status(400).json({ error: 'No songs found in backup file' });
+  }
+
+  const insertSong = db.prepare('INSERT OR REPLACE INTO songs (id,title,key,author) VALUES (?,?,?,?)');
+  const deleteSections = db.prepare('DELETE FROM sections WHERE song_id = ?');
+  const insertSection = db.prepare('INSERT INTO sections (id,song_id,type,position,lyrics_en,lyrics_te) VALUES (?,?,?,?,?,?)');
+
+  const restoreAll = db.transaction((songsToRestore) => {
+    songsToRestore.forEach(song => {
+      const id = song.id || uuidv4();
+      insertSong.run(id, song.title || 'Untitled', song.key || 'C', song.author || '');
+      deleteSections.run(id);
+      (song.sections || []).forEach((sec, i) => {
+        insertSection.run(uuidv4(), id, sec.type || 'Verse 1', i, sec.lyrics_en || '', sec.lyrics_te || '');
+      });
+    });
+  });
+
+  try {
+    restoreAll(songs);
+    io.emit('songs:updated');
+    res.json({ ok: true, count: songs.length });
+  } catch (e) {
+    console.error('Restore error:', e);
+    res.status(500).json({ error: 'Restore failed: ' + e.message });
+  }
+});
+
 // ── Socket.io — Live Presenter Sync ─────────────────────────
 // Anyone can connect and receive presenter:state (needed for the
 // public /display page), but only an authenticated socket
